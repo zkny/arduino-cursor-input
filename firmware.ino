@@ -1,11 +1,3 @@
-/*
-  Parts used:
-  -- Arduino Micro (Pro Miucro, arduino copy with ATmega32U4)
-  -- Digital Rotary Encoder (GND VCC SW DT CLK)
-  -- LCD Display (2x16, i2c interface mounted, GND VCC SDA SCL)
- */
-
-
 #include <LiquidCrystal_PCF8574.h>
 #include <Wire.h>
 #include "Keyboard.h"
@@ -23,7 +15,8 @@ bool OperatingMode = true; // false is cursor, true is tabs, there could be more
 
 LiquidCrystal_PCF8574 lcd(0x27); // set the LCD address to 0x27 for a 16 chars and 2 line display
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
 
   // rotary encoder setup
@@ -35,76 +28,57 @@ void setup() {
   // LCD setup
   Wire.begin();
   Wire.beginTransmission(0x27);
-  lcd.setBacklight(true);
-  lcd.clear();
+
+  if (Wire.endTransmission() == 0) {
+    lcd.begin(16, 2);
+    lcd.setBacklight(true);
+    lcd.setCursor(0, 0);
+    lcd.clear();
+  } else {
+    lcd.setBacklight(false);
+  }
+    
+
+  
 
   // keyboard setup
   Keyboard.begin();
   lcd.print("Cursor mode");
 }
 
-void SendKeyboardInstruction(int Direction) {
-  if (Direction == 1) {
-    /* Encoder turning right */
-    switch (OperatingMode) {
-      case true:
-        Keyboard.write(KEY_RIGHT_ARROW);
-        break;
-      case false:
-        Keyboard.write(KEY_TAB);
-        break;
-    }
-  } else {
-    /* Encoder turning Left */
-    switch (OperatingMode) {
-      case true:
-        Keyboard.write(KEY_LEFT_ARROW);
-        break;
-      case false:
-        Keyboard.press(KEY_LEFT_SHIFT);
-        Keyboard.write(KEY_TAB);
-        delay(20);
-        Keyboard.releaseAll();
-        break;
-    }
-  }
-}
 
-void ChangeOperatingMode() {
-  lcd.clear();
-  /* Could be more then true or false, implement non binary method */
-  OperatingMode = !OperatingMode;
-
-  /* make cases for non binary states */
-  switch (OperatingMode) {
-    case true:
-      lcd.print("Cursor mode");
-      break;
-    case false:
-      lcd.print("Tab mode");
-      break;
-  }
-}
-
-void loop() {
-  // detect rotary turning
+void loop()
+{
+// detect rotary turning      
   ACurrentState = digitalRead(InA);
   if (ACurrentState != ALastState) {
     if (digitalRead(InB) != ACurrentState) {
-      if (smallCounter == -1) {
-        SendKeyboardInstruction(0);
-        smallCounter = 0;
-      } else {
-        smallCounter--;
-      }
+      if (smallCounter == -1) {  
+       if (OperatingMode) {
+         Keyboard.write(KEY_LEFT_ARROW);
+        } else {     
+         Keyboard.press(KEY_LEFT_SHIFT);
+         Keyboard.write(KEY_TAB);
+         delay(20);
+         Keyboard.releaseAll();
+       }
+       smallCounter = 0;
+     } else {
+      smallCounter--;
+     }
+     
     } else {
       if (smallCounter == 1) {
-        SendKeyboardInstruction(1);
+       if (OperatingMode) {
+         Keyboard.write(KEY_RIGHT_ARROW);
+       } else {
+         Keyboard.write(KEY_TAB);
+       }
         smallCounter = 0;
       } else {
-        smallCounter++;
+       smallCounter++; 
       }
-    }
+} 
     ALastState = ACurrentState;
   }
 
@@ -112,11 +86,17 @@ void loop() {
   int ButtonState = digitalRead(Button);
   if (ButtonLastState != ButtonState) {
     if (ButtonState == 0) {
-      ChangeOperatingMode();
+      lcd.clear();  
       ButtonLastState = 0;
+      OperatingMode = !OperatingMode;
+      if (OperatingMode) {
+        lcd.print("Cursor mode");
+      } else {
+        lcd.print("Tab mode");
+      }
     } else {
       ButtonLastState = 1;
     }
-    delay(100); // prevent accidental double click
-  }
+   delay(100); // prevent accidental double click 
+  }     
 }
